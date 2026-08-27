@@ -1,4 +1,4 @@
-console.log("✅ background.js 2.0 запущен");
+console.log("✅ background.js 3.0 запущен");
 
 let isProcessing = false
 let lastAdvancedSearchUrl
