@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "IYoula",
+  "version": "1.0",
+  "description": "Различные апгрейды для работы в youla",
+  "author": "Oleg Sazonov, Ilya Akhmanov",
+  "permissions": ["scripting", "activeTab", "storage", "webRequest", "tabs", "notifications"],
+  "host_permissions": ["https://youla.2gis.local/*"],
+  "icons": {
+        "16":"icons/16.png",
+        "32":"icons/32.png",
+        "48":"icons/48.png",
+        "128":"icons/128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://youla.2gis.local/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "IYoula",
+    "default_popup": "popup.html"
+    }
+}
