@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IYoula",
-  "version": "1.0",
+  "version": "3.0",
   "description": "Различные апгрейды для работы в youla",
   "author": "Oleg Sazonov, Ilya Akhmanov",
   "permissions": ["scripting", "activeTab", "storage", "webRequest", "tabs", "notifications"],
