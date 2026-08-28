@@ -127,13 +127,13 @@ function updateVisibleRows() { // функция которая запускае
 function highlightList(list, kind) { // Подсвечивает нужные сискоды
   if (!list || !list.length) return; // Прерывает функцию если список пуст
 
-  const ids = new Set(list.map(x => x.id)); // создает множество с id из нужного массива
+  const ids = new Set(list.map(x => String(x.id))); // создает множество с id из нужного массива
 
   document.querySelectorAll("a.vorwand-id").forEach(link => { // Находим все элементы с id на странице
     const match = link.href.match(/id=(\d+)/); // Вытаскиваю из найденных объектов конкретные id
     if (!match) return; // если id на странице нет, то прерываем
 
-    const id = Number(match[1]); // превращение id в число
+    const id = match[1]
 
     if (ids.has(id)) { // Проверяем есть ли id в списке от API и подсвечиваем нужным цветом
       if (kind === "expired") {
