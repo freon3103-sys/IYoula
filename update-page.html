@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Обновление IYoula</title>
+
+    <link rel="stylesheet" href="https://freon3103-sys.github.io/IYoula/update-page.css">
+</head>
+<body>
+    <div class="page-background">
+        <main class="update-card">
+            <div class="top-line">
+                <div class="brand">
+                    <div class="brand-icon">I</div>
+
+                    <div>
+                        <div class="brand-name">IYoula</div>
+                        <div class="brand-subtitle">Расширение для работы с ЗЦ</div>
+                    </div>
+                </div>
+
+                <div class="release-label">
+                    NEW RELEASE
+                </div>
+            </div>
+
+            <section class="hero">
+                <div class="hero-icon">
+                    <svg
+                        width="52"
+                        height="52"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M12 3V15"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                        />
+                        <path
+                            d="M7 10L12 15L17 10"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                        <path
+                            d="M5 20H19"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <div class="eyebrow">Доступно обновление</div>
+
+                    <h1>
+                        IYoula
+                        <span id="version">...</span>
+                    </h1>
+
+                    <p class="hero-text" id="summary">
+                        Загружаем информацию об обновлении...
+                    </p>
+                </div>
+            </section>
+
+            <section class="changes-section">
+                <div class="section-heading">
+                    <div>
+                        <div class="section-eyebrow">История изменений</div>
+                        <h2>Что нового</h2>
+                    </div>
+
+                    <div class="change-count" id="changeCount">
+                        0 изменений
+                    </div>
+                </div>
+
+                <div class="changes-list" id="changes">
+                    <div class="loading-item">
+                        <span class="loading-dot"></span>
+                        <span>Загружаем список изменений...</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="info-box">
+                <div class="info-icon">i</div>
+
+                <div>
+                    <strong>Рекомендуется обновиться</strong>
+
+                    <p>
+                        Новая версия содержит улучшения и исправления,
+                        которые делают работу с Youla удобнее и стабильнее.
+                    </p>
+                </div>
+            </section>
+
+            <div class="actions">
+                <a
+                    id="downloadButton"
+                    class="button button-primary"
+                    href="https://github.com/freon3103-sys/IYoula/archive/refs/heads/main.zip"
+                    target=""
+                    rel="noopener noreferrer"
+                >
+                    Скачать обновление
+                    <span class="button-arrow">→</span>
+                </a>
+
+                <button
+                    id="closeButton"
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Закрыть
+                </button>
+            </div>
+
+            <footer class="footer">
+                <span>Спасибо, что используете IYoula</span>
+                <span class="footer-dot">•</span>
+                <span>Команда IYoula</span>
+            </footer>
+        </main>
+    </div>
+
+    <script src="update-page.js"></script>
+</body>
+</html>
