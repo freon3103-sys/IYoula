@@ -1,28 +1,40 @@
-console.log("✅ background.js 3.0 запущен");
+console.log("✅ background.js запущен");
 
 let isProcessing = false;
-let lastAdvancedSearchUrl;
-let apiAuthorization = null;
-let updateUrl = "https://github.com/freon3103-sys/IYoula";
+let lastAdvancedSearchUrl = null;
 
-const remoteUpdateUrl = "https://freon3103-sys.github.io/IYoula/update.json";
-const localUpdateUrl = chrome.runtime.getURL("update.json");
+let updateUrl = "https://freon3103-sys.github.io/IYoula/update-page.html"; // ссылка которая открывается при нажатии на уведомление об обновлении
+const update_id = "тест 1"
+
+const remoteUpdateUrl = "https://freon3103-sys.github.io/IYoula/update.json"; // ссылка с документом с актуальной версией расширения
+const localUpdateUrl = chrome.runtime.getURL("manifest.json"); // ссылка с документом с локальной версией расширения
+
+let first_enableIntercept = false // флаг первого перехвата
 
 // =======================
-// ✅ UPDATE CHECK
+// ✅ Блок проверки обновления
 // =======================
 
+// функция проверки обновления
 async function checkForUpdate() {
+  
   console.log("запускается проверка обновления");
 
   try {
-    const localResponse = await fetch(localUpdateUrl);
-    const updateData = await localResponse.json();
-    const currentVersion = updateData.version;
+    const localResponse = await fetch(localUpdateUrl, { // получаем файл с локальной версией расширения
+      cache: "no-store"
+    });
 
-    console.log("Локальный update.json:", updateData);
+    if (!localResponse.ok) {
+      throw new Error(`Ошибка локального manifest.json: ${localResponse.status}`);
+    }
 
-    const response = await fetch(remoteUpdateUrl + "?t=" + Date.now(), {
+    const updateData = await localResponse.json(); // получаем json
+    const currentVersion = updateData.version; // получаем версию
+
+    console.log("Локальный manifest.json:", updateData);
+
+    const response = await fetch(remoteUpdateUrl + "?t=" + Date.now(), { // получаем файл с актуальной версией расширения
       cache: "no-store"
     });
 
@@ -33,7 +45,7 @@ async function checkForUpdate() {
     let remoteUpdate;
 
     try {
-      remoteUpdate = await response.json();
+      remoteUpdate = await response.json(); // получаем json
     } catch (e) {
       throw new Error("Не удалось распарсить JSON");
     }
@@ -42,37 +54,47 @@ async function checkForUpdate() {
       throw new Error('Неверный формат данных: нет поля "version" в update.json');
     }
 
-    const remoteVersion = remoteUpdate.version;
+    if (remoteUpdate.enabled === false) {
+    console.log("ℹ️ Уведомления об обновлении отключены в update.json");
+    return;
+    }
+
+    const remoteVersion = remoteUpdate.version; // получаем версию
 
     console.log("remoteVersion:", remoteVersion, typeof remoteVersion);
     console.log("currentVersion:", currentVersion, typeof currentVersion);
 
-    if (isNewerVersion(remoteVersion, currentVersion)) {
+    if (isNewerVersion(remoteVersion, currentVersion)) { // производим сравнение
       console.log(`Доступна новая версия: ${remoteVersion}`);
 
-      updateUrl = remoteUpdate.downloadUrl || updateData.downloadUrl || updateUrl;
-
-      chrome.notifications.create("update-available", {
+      chrome.notifications.create(update_id, {
         type: "basic",
         iconUrl: "icons/128.png",
         title: "Доступно обновление!",
         message: `Вышла новая версия: ${remoteVersion}\nКликни на меня для скачивания новой версии!`,
         priority: 2
+      }, (notificationId) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "❌ Ошибка создания уведомления:",
+            chrome.runtime.lastError.message
+          );
+          return;
+        }
+
+        console.log("✅ Уведомление создано:", notificationId);
       });
+      
     } else {
       console.log("Обновлений нет.");
     }
+
   } catch (error) {
     console.error("Ошибка при проверке обновления:", error);
   }
 }
 
-chrome.notifications.onClicked.addListener((id) => {
-  if (id === "update-available") {
-    chrome.tabs.create({ url: updateUrl });
-  }
-});
-
+// функция сравнения версии
 function isNewerVersion(a, b) {
   const partsA = String(a).trim().split(".").map(Number);
   const partsB = String(b).trim().split(".").map(Number);
@@ -88,82 +110,87 @@ function isNewerVersion(a, b) {
   return false;
 }
 
-// =======================
-// ✅ AUTH TOKEN CAPTURE
-// =======================
-
-function captureApiAuthorization(details) {
-  if (!details.url.includes("/api/internal/vorwands/advanced-search")) return;
-
-  const authHeader = details.requestHeaders?.find(
-    h => h.name.toLowerCase() === "authorization"
-  );
-
-  if (authHeader?.value) {
-    apiAuthorization = authHeader.value;
-    console.log("✅ Authorization сохранён");
+// переход по клику для уведомления
+chrome.notifications.onClicked.addListener((id) => {
+  if (id === update_id) {
+    chrome.tabs.create({ url: updateUrl });
   }
-}
+});
 
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  captureApiAuthorization,
-  { urls: ["https://youla-api.2gis.ru/*"] },
-  ["requestHeaders", "extraHeaders"]
-);
+// =======================
+// ✅ Блок получения токена от content
+// =======================
 
-function getApiHeaders() {
-  const headers = {
-    "Accept": "application/json, text/javascript, */*; q=0.01"
-  };
+// функция получение JWT
+async function getApiHeadersForTab(tabId) {
+  const token = await getJwtFromTab(tabId);
 
-  if (apiAuthorization) {
-    headers["Authorization"] = apiAuthorization;
-  } else {
-    console.log("⚠️ Authorization ещё не получен");
+  if (!token) {
+    throw new Error("Требуется авторизация");
   }
 
-  return headers;
+  return buildApiHeaders(token);
 }
 
-function waitForAuthorization(timeout = 1500) {
-  return new Promise(resolve => {
-    if (apiAuthorization) {
-      resolve(apiAuthorization);
+// отправка запроса в content
+function getJwtFromTab(tabId) {
+  return new Promise((resolve) => {
+    if (tabId === undefined || tabId < 0) {
+      console.log("⚠️ Это не вкладка");
+      resolve(null);
       return;
     }
 
-    const start = Date.now();
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: "getJWT" },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.log(
+            "⚠️ Не получилось получить токен из content",
+            chrome.runtime.lastError.message
+          );
 
-    function check() {
-      if (apiAuthorization) {
-        resolve(apiAuthorization);
-        return;
+          resolve(null);
+          return;
+        }
+
+        resolve(response?.token || null);
       }
-
-      if (Date.now() - start >= timeout) {
-        console.log("⛔ Authorization не появился за время ожидания");
-        resolve(null);
-        return;
-      }
-
-      setTimeout(check, 100);
-    }
-
-    check();
+    );
   });
 }
 
+// создание json токена
+function buildApiHeaders(token) {
+  if (!token) {
+    throw new Error("Требуется авторизация");
+  }
+
+  return {
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Authorization": token
+  };
+}
+
 // =======================
-// ✅ API HELPERS
+// ✅ Блок обработки АПИ запросов
 // =======================
 
+// чтение ответа от АПИ
 async function readJsonResponse(res, label = "api") {
   const text = await res.text();
 
   console.log(`${label} response status:`, res.status);
 
+  if (res.status === 401) {
+    console.log(`⛔ ${label}: Authorization невалидный или истёк`);
+  
+    throw new Error("HTTP 401: Authorization невалидный или истёк");
+  }
+
   if (!res.ok) {
-    console.log(`${label} error text:`, text);
+    console.log(`${label} error text:`, text.slice(0, 300));
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
 
@@ -182,30 +209,20 @@ async function readJsonResponse(res, label = "api") {
 
   const items = data?.paging?.resultItems || [];
   const total = data?.paging?.total || 0;
+  const from = data?.paging?.from;
+  const pageSize = data?.paging?.pageSize;
 
-  console.log(`📦 ${label} полный JSON:`, data);
-  console.log(`📊 ${label}: total = ${total}, items на странице = ${items.length}`);
-
-  console.table(
-    items.map(item => ({
-      id: item.id,
-      branch: item.branch,
-      status: item.status,
-      resolution: item.resolution,
-      planDateUtc: item.planDateUtc,
-      creationDateUtc: item.creationDateUtc,
-      title: item.title
-    }))
-  );
+  console.log(`📊 ${label}: total=${total}, from=${from}, pageSize=${pageSize}, items=${items.length}`);
 
   return data;
 }
 
+// обработка ответа от АПИ
 function parseIds(data) {
   if (!data.paging || !data.paging.resultItems) return [];
 
   return data.paging.resultItems.map(item => ({
-    id: item.id,
+    id: String(item.id),
     date: item.planDateUtc,
     branch: item.branch,
     title: item.title
@@ -213,37 +230,44 @@ function parseIds(data) {
 }
 
 // =======================
-// ✅ WEB REQUEST HANDLE
+// ✅ Блок перехвата и отправки запросов
 // =======================
 
+// перехват и отправка запросов по поиску
 async function handleRequest(details) {
-  if (details.tabId < 0) {
+  
+  if (details.tabId < 0) { // не обрабатываем запросы от расширений
     console.log("⏭ Запрос не из вкладки, пропускаем:", details.url);
     return;
   }
 
-  if (details.url.includes("/api/internal/vorwands/advanced-search")) {
+  if (details.url.includes("/api/internal/vorwands/advanced-search")) { // сохраняем последней запрос к АПИ
     lastAdvancedSearchUrl = details.url;
   }
 
-  if (isProcessing) {
+  if (isProcessing) { // не запускаем повторную обработку
     console.log("⛔ Уже обрабатываем — пропуск");
     return;
   }
 
-  if (details.url.includes("planDateRanges=0") || details.url.includes("planDateRanges=1")) return;
+  if ( // Не обрабатываем запросы, которые расширение само делает для подсветки
+    details.url.includes("planDateRanges=0") ||
+    details.url.includes("planDateRanges=1")
+  ) {
+    return;
+  }
 
-  if (!details.url.includes("/api/internal/vorwands/advanced-search")) return;
+  if (!details.url.includes("/api/internal/vorwands/advanced-search")) return; // если не из поиска
 
-  isProcessing = true;
+  isProcessing = true; // включаем флаг чтобы не запускать несколько одинаковых запросов
 
   try {
     console.log("Перехвачено:", details.url);
 
-    await waitForAuthorization();
+    const headers = await getApiHeadersForTab(details.tabId); // получаем токен
 
     const baseExpired = new URL(details.url);
-    baseExpired.searchParams.set("planDateRanges", "0");
+    baseExpired.searchParams.set("planDateRanges", "0"); // создаем апи запросы для истекших или истекаемых
 
     const baseToday = new URL(details.url);
     baseToday.searchParams.set("planDateRanges", "1");
@@ -256,13 +280,17 @@ async function handleRequest(details) {
 
     const MAX_PAGES = 5;
     const MAX_ITEMS = 250;
+    const PAGE_SIZE = 50;
 
     while (true) {
       if (page >= MAX_PAGES) break;
       if (allExpired.length >= MAX_ITEMS || allToday.length >= MAX_ITEMS) break;
 
       baseExpired.searchParams.set("from", String(from));
+      baseExpired.searchParams.set("pageSize", String(PAGE_SIZE));
+
       baseToday.searchParams.set("from", String(from));
+      baseToday.searchParams.set("pageSize", String(PAGE_SIZE));
 
       const urlExpired = baseExpired.toString();
       const urlToday = baseToday.toString();
@@ -272,39 +300,45 @@ async function handleRequest(details) {
       const [rExpired, rToday] = await Promise.all([
         fetch(urlExpired, {
           credentials: "include",
-          headers: getApiHeaders()
+          headers
         }),
         fetch(urlToday, {
           credentials: "include",
-          headers: getApiHeaders()
+          headers
         })
       ]);
 
-      const dataExpired = parseIds(await readJsonResponse(rExpired, "expired"));
-      const dataToday = parseIds(await readJsonResponse(rToday, "today"));
+      const dataExpired = parseIds(await readJsonResponse(rExpired, `expired from=${from}`));
+      const dataToday = parseIds(await readJsonResponse(rToday, `today from=${from}`));
 
       console.log("Ответ:", dataExpired.length, dataToday.length);
+      console.log("Ответ:", dataExpired, dataToday);
 
       if (dataExpired.length === 0 && dataToday.length === 0) break;
 
       allExpired.push(...dataExpired);
       allToday.push(...dataToday);
 
-      from += 50;
+      if (dataExpired.length < PAGE_SIZE && dataToday.length < PAGE_SIZE) { // Если обе выборки вернули меньше PAGE_SIZE — дальше страниц нет
+        console.log("✅ Больше страниц нет — останавливаем цикл");
+        break;
+      }
+
+      from += PAGE_SIZE;
       page++;
     }
+
+    console.log("🟥 expired итог:", allExpired.length);
+    console.log("🟨 today итог:", allToday.length);
 
     chrome.tabs.sendMessage(details.tabId, {
       type: "vorwandData",
       expired: allExpired,
       today: allToday
-    }, () => {
-      if (chrome.runtime.lastError) {
-        console.log("⚠️ Не удалось отправить vorwandData:", chrome.runtime.lastError.message);
-      }
     });
 
     console.log("✅ ДАННЫЕ ОТПРАВЛЕНЫ");
+
   } catch (e) {
     console.error("❌ Ошибка:", e);
   } finally {
@@ -313,14 +347,20 @@ async function handleRequest(details) {
 }
 
 // =======================
-// ✅ INTERCEPT CONTROL
+// ✅ Блок перехвата
 // =======================
 
 const filter = {
   urls: ["https://youla-api.2gis.ru/*"]
 };
 
+// включаем перехват
 function enableIntercept() {
+
+  if (!first_enableIntercept) {
+    console.log("это первое включение ON");
+    first_enableIntercept = true
+  }
   if (chrome.webRequest.onBeforeRequest.hasListener(handleRequest)) return;
 
   chrome.webRequest.onBeforeRequest.addListener(handleRequest, filter);
@@ -328,6 +368,7 @@ function enableIntercept() {
   console.log("🟢 Перехват включён");
 }
 
+// выключаем перехват
 function disableIntercept() {
   if (!chrome.webRequest.onBeforeRequest.hasListener(handleRequest)) return;
 
@@ -336,14 +377,17 @@ function disableIntercept() {
   console.log("🛑 Перехват выключен");
 }
 
+enableIntercept() // запускаем перехват базово
+
 // =======================
-// ✅ MESSAGES
+// ✅ Блок обработки сообщенией от content
 // =======================
 
+// включаем ожидание сообщений от content
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   console.log("получено состояние:", msg.type);
-
-  if (msg.type === "check_update") {
+  
+  if (msg.type === "check_update") { // обновление
     console.log("получена команда на проверку обновления");
 
     checkForUpdate();
@@ -352,12 +396,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return;
   }
 
-  if (msg.type === "getLastAdvancedSearchUrl") {
+  if (msg.type === "getLastAdvancedSearchUrl") { // последний запрос апи
     sendResponse({ url: lastAdvancedSearchUrl });
     return;
   }
 
-  if (msg.type === "mapSelected") {
+  if (msg.type === "mapSelected") { // переключения состояния перехвата вкл/выкл
     console.log("📨 Получено состояние:", msg.value);
 
     if (msg.value === true) {
@@ -372,29 +416,63 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return;
   }
 
-  if (msg.type === "contact") {
+  if (msg.type === "contact") { // контакты
     const value = msg.value;
+    const token = msg.token;
 
     console.log("📨 contact:", value);
 
-    const url = `https://youla-api.2gis.ru/api/internal/vorwands/advanced-search?searchString=${encodeURIComponent(value)}&pageSize=50&from=0`;
+    const url = `https://youla-api.2gis.ru/api/internal/vorwands/advanced-search?searchString=${encodeURIComponent(value)}&pageSize=50&sortField=CreationDateUtc&sortOrder=Descending&from=0`;
 
-    waitForAuthorization()
-      .then(() => {
-        return fetch(url, {
-          method: "GET",
-          credentials: "include",
-          headers: getApiHeaders()
-        });
-      })
-      .then(res => readJsonResponse(res, "contact"))
-      .then(data => {
-        console.log("📦 API ответ:", data);
+    (async () => {
+      try {
+        const headers = buildApiHeaders(token);
 
-        const items = data?.paging?.resultItems || [];
-        const count = data?.paging?.total || 0;
+        const PAGE_SIZE = 50;
+        const MAX_CONTACT_PAGES = 5; // максимум 250 ЗЦ в tooltip
 
-        const links = items.map(item => {
+        const baseUrl = new URL(url);
+
+        let from = 0;
+        let page = 0;
+        let total = 0;
+        let allItems = [];
+
+        while (page < MAX_CONTACT_PAGES) {
+          baseUrl.searchParams.set("from", String(from));
+          baseUrl.searchParams.set("pageSize", String(PAGE_SIZE));
+
+          const pageResponse = await fetch(baseUrl.toString(), {
+            method: "GET",
+            credentials: "include",
+            headers
+          });
+
+          const pageData = await readJsonResponse(
+            pageResponse,
+            `contact from=${from}`
+          );
+
+          const pageItems = pageData?.paging?.resultItems || [];
+
+          total = Number(pageData?.paging?.total || total);
+
+          allItems.push(...pageItems);
+
+          // Если элементов меньше страницы,
+          // значит следующей страницы уже нет.
+          if (pageItems.length < PAGE_SIZE) {
+            break;
+          }
+
+          from += PAGE_SIZE;
+          page++;
+        }
+
+        console.log("📦 API ответ contact получен");
+        console.log(`📊 Найдено всего: ${total}, загружено для tooltip: ${allItems.length}`);
+
+        const links = allItems.map(item => {
           return {
             url: `https://youla.2gis.local/vorwand#/id=${item.id}`,
             title: item.title,
@@ -403,48 +481,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
 
         sendResponse({
-          count: count,
+          count: total,
           links: links,
           value: value
         });
-      })
-      .catch(err => {
+
+      } catch (err) {
         console.error("❌ API error contact:", err);
 
         sendResponse({
           count: 0,
           links: []
         });
-      });
+      }
+    })();
 
     return true;
   }
 
-  if (msg.type === "filter") {
+  if (msg.type === "filter") { // фильтры
     const url = msg.url;
+    const token = msg.token;
 
-    console.log("📨 filter URL:", url);
+    if (!token) {
+      sendResponse({
+        count: 0,
+        authMissing: true
+      });
 
-    waitForAuthorization()
-      .then(() => {
-        return fetch(url, {
-          method: "GET",
-          credentials: "include",
-          headers: getApiHeaders()
-        });
-      })
+      return;
+    }
+
+    fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: buildApiHeaders(token)
+    })
       .then(res => readJsonResponse(res, "filter"))
       .then(data => {
-        console.log("📦 API ответ фильтра:", data);
-
-        const count = data?.paging?.total || 0;
-
         sendResponse({
-          count: count
+          count: data?.paging?.total || 0
         });
       })
-      .catch(err => {
-        console.error("❌ API error filter:", err);
+      .catch(error => {
+        console.error("❌ Filter API error:", error);
 
         sendResponse({
           count: 0
@@ -452,5 +532,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       });
 
     return true;
-  }
+}
 });
