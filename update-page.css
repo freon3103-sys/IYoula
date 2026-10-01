@@ -435,3 +435,29 @@ h2 {
         flex-wrap: wrap;
     }
 }
+
+.instruction-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 8px;
+    color: var(--blue-dark);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.instruction-link:hover {
+    text-decoration: underline;
+}
+
+.brand-icon {
+    color: white;
+}
+
+@media (max-width: 620px) {
+    .instruction-link {
+        width: 100%;
+        justify-content: center;
+        padding: 10px;
+    }
+}

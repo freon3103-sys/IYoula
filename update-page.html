@@ -6,23 +6,54 @@
 
     <title>Обновление IYoula</title>
 
-    <link rel="stylesheet" href="https://freon3103-sys.github.io/IYoula/update-page.css">
+    <link rel="stylesheet" href="update-page.css">
 </head>
+
 <body>
     <div class="page-background">
         <main class="update-card">
             <div class="top-line">
                 <div class="brand">
-                    <div class="brand-icon">I</div>
+                    <div class="brand-icon" title="IYoula">
+                        <svg
+                            width="26"
+                            height="26"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M12 3V15"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                            />
+                            <path
+                                d="M7 10L12 15L17 10"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                            <path
+                                d="M5 20H19"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                    </div>
 
                     <div>
                         <div class="brand-name">IYoula</div>
-                        <div class="brand-subtitle">Расширение для работы с ЗЦ</div>
+                        <div class="brand-subtitle">
+                            Расширение для работы с ЗЦ
+                        </div>
                     </div>
                 </div>
 
                 <div class="release-label">
-                    NEW RELEASE
+                    ОБНОВЛЕНИЕ
                 </div>
             </div>
 
@@ -58,10 +89,12 @@
                 </div>
 
                 <div>
-                    <div class="eyebrow">Доступно обновление</div>
+                    <div class="eyebrow">
+                        Доступно обновление
+                    </div>
 
                     <h1>
-                        IYoula
+                        Вышла новая версия
                         <span id="version">...</span>
                     </h1>
 
@@ -74,7 +107,6 @@
             <section class="changes-section">
                 <div class="section-heading">
                     <div>
-                        <div class="section-eyebrow">История изменений</div>
                         <h2>Что нового</h2>
                     </div>
 
@@ -95,11 +127,12 @@
                 <div class="info-icon">i</div>
 
                 <div>
-                    <strong>Рекомендуется обновиться</strong>
+                    <strong>Как обновить расширение</strong>
 
                     <p>
-                        Новая версия содержит улучшения и исправления,
-                        которые делают работу с Youla удобнее и стабильнее.
+                        Скачайте архив новой версии, замените файлы
+                        в папке расширения и нажмите Reload
+                        в chrome://extensions.
                     </p>
                 </div>
             </section>
@@ -108,27 +141,37 @@
                 <a
                     id="downloadButton"
                     class="button button-primary"
-                    href="https://github.com/freon3103-sys/IYoula/archive/refs/heads/main.zip"
-                    target=""
-                    rel="noopener noreferrer"
+                    href="#"
                 >
                     Скачать обновление
                     <span class="button-arrow">→</span>
                 </a>
 
-                <button
-                    id="closeButton"
+                <a
+                    id="fallbackDownloadButton"
                     class="button button-secondary"
-                    type="button"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
                 >
-                    Закрыть
-                </button>
+                    Если скачивание не началось
+                </a>
+
+                <a
+                    id="instructionsButton"
+                    class="instruction-link"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Инструкция по обновлению
+                </a>
             </div>
 
             <footer class="footer">
-                <span>Спасибо, что используете IYoula</span>
+                <span>IYoula</span>
                 <span class="footer-dot">•</span>
-                <span>Команда IYoula</span>
+                <span>Расширение для работы с ЗЦ</span>
             </footer>
         </main>
     </div>
