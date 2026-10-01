@@ -47,11 +47,9 @@ async function loadUpdatePage() {
             updateData.downloadUrl ||
             "#";
 
-        const instructionsUrl =
-            updateData.instructionsUrl ||
-            "https://freon3103-sys.github.io/IYoula/instructions.html";
+        const instructionsUrl = updateData.instructionsUrl;
 
-        document.title = `IYoula ${version} — обновление`;
+        document.title = `IYoula ${version} — обновление` || null;
 
         versionElement.textContent = version;
         summaryElement.textContent = summary;
