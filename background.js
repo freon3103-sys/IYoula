@@ -4,7 +4,7 @@ let isProcessing = false;
 let lastAdvancedSearchUrl = null;
 
 let updateUrl = "https://freon3103-sys.github.io/IYoula/update-page.html"; // ссылка которая открывается при нажатии на уведомление об обновлении
-const update_id = "тест 1"
+let update_id
 
 const remoteUpdateUrl = "https://freon3103-sys.github.io/IYoula/update.json"; // ссылка с документом с актуальной версией расширения
 const localUpdateUrl = chrome.runtime.getURL("manifest.json"); // ссылка с документом с локальной версией расширения
@@ -60,6 +60,7 @@ async function checkForUpdate() {
     }
 
     const remoteVersion = remoteUpdate.version; // получаем версию
+    update_id = remoteUpdate.update_id // получаем id
 
     console.log("remoteVersion:", remoteVersion, typeof remoteVersion);
     console.log("currentVersion:", currentVersion, typeof currentVersion);
