@@ -40,11 +40,11 @@ async function loadUpdatePage() {
             ? updateData.changes
             : [];
 
-        const downloadUrl = updateData.downloadUrl || "#";
+        const downloadUrl = updateData.FirstDownloadUrl || "#";
 
         const fallbackDownloadUrl =
             updateData.fallbackDownloadUrl ||
-            updateData.downloadUrl ||
+            updateData.FirstDownloadUrl ||
             "#";
 
         const instructionsUrl = updateData.instructionsUrl;
