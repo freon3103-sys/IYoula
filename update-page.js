@@ -60,7 +60,7 @@ async function loadUpdatePage() {
         renderChanges(changesElement, changes);
 
         // Основная кнопка: браузер пытается скачать архив.
-        downloadButton.href = FirstDownloadUrl;
+        downloadButton.href = downloadUrl;
         downloadButton.setAttribute("download", "");
 
         // Запасная ссылка: открывается в новой вкладке.
