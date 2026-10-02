@@ -40,11 +40,11 @@ async function loadUpdatePage() {
             ? updateData.changes
             : [];
 
-        const downloadUrl = updateData.FirstDownloadUrl || "#";
+        const firstdownloadUrl = updateData.firstDownloadUrl || "#";
 
         const fallbackDownloadUrl =
             updateData.fallbackDownloadUrl ||
-            updateData.FirstDownloadUrl ||
+            updateData.firstDownloadUrl ||
             "#";
 
         const instructionsUrl = updateData.instructionsUrl;
@@ -60,7 +60,7 @@ async function loadUpdatePage() {
         renderChanges(changesElement, changes);
 
         // Основная кнопка: браузер пытается скачать архив.
-        downloadButton.href = downloadUrl;
+        downloadButton.href = firstdownloadUrl;
         downloadButton.setAttribute("download", "");
 
         // Запасная ссылка: открывается в новой вкладке.
