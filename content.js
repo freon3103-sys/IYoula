@@ -1,17 +1,9 @@
 console.log("✅ content.js запущен")
 
 // RoadMap
-// total refactoring ⚠️
-// Баг при отмене создания фильтра ⚠️
-// Уведомление на кнопке закрыть зц ⚠️
-// Исправить дублирование апи запросов ⚠️
-// Добавлено открытие фильтра в новом окне по клику средней кнопки мыши ⚠️
-// Версия базы данных: добавить в regdata ⚠️
-// добавить СпидКамОнлайн ⚠️
-// Приоритетность показа ЗЦ от открытых до закрытых или по резолюции, возможно кнопка выбора фильтров ⚠️
-// Настроить версию базы данных + добавит версию базы данных онлайн ⚠️
-// Сделать систему скачивания обновлнения через html страницу
-
+// меню настроек
+// refactoring блока ссылок
+// время когда прокладывался маршрут вывести под базой данных
 // В списке показывать только зц кроме открытой
 // новости уведомления пуши
 // массовое изменение атрибутов зацепки
@@ -20,9 +12,11 @@ console.log("✅ content.js запущен")
 // Добавление кнопок ссылка на яндекс поиск
 // ФИАС добавить поиск в ФИАС по адресу
 // Перевод резолюций на русский язык
+// Добавить ссылки на новый объект карты и на новые объекты карты
 
-
-// Проверка обновления версии
+// =======================
+// ✅ Проверка обновления версии
+// =======================
 chrome.runtime.sendMessage({type: "check_update"});
 
 // =======================
@@ -51,7 +45,11 @@ let lastMapSelectedValue = null; // флаг для понимания можн�
 async function init() {
   console.log("🚀 init старт");
 
+  await loadSettings(); // Загружаем настройки до запуска логики страницы.
+
   chrome.runtime.onMessage.addListener(handleRuntimeMessage);  // следим за ответами от background
+
+  chrome.storage.onChanged.addListener(handleSettingsChanged); // Слушаем изменения настроек из popup.
 
   const url = window.location.href;  // получаем хеш
   state_url = check_innerurl(url);  // проверяем где находится пользователь
@@ -144,14 +142,19 @@ function mainlogic() {
   if (state_url === "search") {
     
     console.log("mainlogic: это страница поиска");
-    draw_filters(); // отрисовываем фильтры
+    
+    if (settings.filtersEnabled) {
+      draw_filters();
+    } // отрисовываем фильтры
 
     if (!hasVorwands) {
       console.log("ℹ️ В текущем поиске ЗЦ нет, подсветка не нужна");
       return;
     }
 
-    updateVisibleRows(); // обновляем подсветку
+    if (settings.highlightEnabled) {
+      updateVisibleRows();
+    } // обновляем подсветку
 
     return;
   }
@@ -160,19 +163,24 @@ function mainlogic() {
     console.log("📄 Логика страницы ЗЦ");
 
     updatedate(); // проверка даты
-    waitForMail([ // обработка контактов
-      'a[href^="fiji://editBySysCode/"]',
-      'a[href^="mailto:"]',
-      'a[href*="vk.com"]',
-      'a[href*="plus.google.com"]'
-    ], () => {
-      console.log("✅ Контакты страницы готовы запускаю обработку");
 
-      processContacts(); // получение и отправка контактов
-      
-    });
-    
-    checkPage(); // обработка ссылок
+    if (settings.contactsEnabled) {
+      waitForMail([ // обработка контактов
+        'a[href^="fiji://editBySysCode/"]',
+        'a[href^="mailto:"]',
+        'a[href*="vk.com"]',
+        'a[href*="plus.google.com"]',
+        "sender"
+      ], () => {
+        console.log("✅ Контакты страницы готовы запускаю обработку");
+
+        processContacts(); // получение и отправка контактов
+        
+      });
+    }
+    if (settings.mapLinksEnabled) {
+      checkPage(); // обработка ссылок
+    }
   }
     
 
@@ -348,6 +356,10 @@ function start_hashchange() {
 
 // функция которая запускает функцию по обновлению строк
 function updateVisibleRows() {
+  console.log("Запускаем updateVisibleRows");
+  
+  if (!settings.highlightEnabled) return;
+  console.log("Подсветка включена");
   if (!vorwandData) return;
 
   console.log("🔄 Обновляем строки");
@@ -546,6 +558,15 @@ async function draw_filters(attempt = 0) {
     reload_filter(window.location.hash);
   };
 
+  const resetBtn = document.createElement("button");
+
+  resetBtn.textContent = "⤴";
+  resetBtn.title = "Вернуться на стартовую страницу Youla";
+
+  resetBtn.onclick = () => {
+    window.location.href = "https://youla.2gis.local/";
+  };
+
   if (filters.length === 0) { // если фльтров в памяти нет
     const empty = document.createElement("div");
     empty.textContent = "Нет сохранённых фильтров";
@@ -682,6 +703,7 @@ async function draw_filters(attempt = 0) {
     
   });
   container.appendChild(reloadBtn); // добавляем кнопку обновления
+  container.appendChild(resetBtn); // добавляем кнопку сброса
   anchor.after(container); // добавляем весь блок фильтров на экран
 }
 
@@ -828,6 +850,11 @@ function buildApiUrl(filter) {
 // слежка за изменением DOM для страницы ЗЦ
 function start_date_DOMchange() {
 
+  if (date_observer) {
+    console.log("ℹ️ Observer даты уже запущен");
+    return;
+  }
+
   console.log("запускаем обсервер на дату")
   
   date_observer = new MutationObserver(() => { // устанавливаем слежку за изменениями в DOM
@@ -846,6 +873,11 @@ function start_date_DOMchange() {
 
 // Основная функция предотвращения закрытия зацепки
 function handleCloseExpiredVorwand(evt) {
+
+  if (!settings.closeWarningEnabled) {
+    return;
+  }
+
   const closeBtn = evt.target.closest(
     'a.btn.close-vorwand-force, a.btn.tags__toggle[href="#closeVorwandModal"]'
   );
@@ -925,6 +957,8 @@ function highlight_date(kind) {
 
   dodate.style.backgroundColor = ""; // очищаем вначале
 
+  if (!settings.highlightEnabled) return;
+
   if (kind === "expired") {
     dodate.style.backgroundColor = "rgba(255, 0, 0, 0.44)";
   } else if (kind === "today") {
@@ -979,6 +1013,26 @@ function waitForMail(selectors, callback) {
 // функция для проверки селекторов на странице
 function findFirstContactElement(selectors) {
     for (const selector of selectors) { // выбирается селектор
+
+        if (selector === "sender") { // поиск отправителя
+          const container = document.querySelector(
+            "div.vorwand-full-description"
+          );
+
+          const senderData = getSenderData(container);
+
+          if (senderData) {
+            console.log(
+              "✅ Найден отправитель:",
+              senderData.value
+            );
+
+            return senderData.el;
+          }
+
+          continue;
+        }
+
         const elements = document.querySelectorAll(selector); // находятся все элементы по селектору
 
         for (const el of elements) {
@@ -996,23 +1050,100 @@ function findFirstContactElement(selectors) {
         }
     }
 
-    const divs = document.querySelectorAll('div');
-
-    for (const div of divs) {
-        const label = div.querySelector("b, strong");
-
-        if (label && label.textContent.includes("Отправитель")) { // находим отправителя
-            const text = div.innerText.replace("Отправитель", "").trim();
-
-            if (text) {
-                console.log("✅ найден отправитель");
-                return div;
-            }
-        }
-    }
-
     return null;
 };
+
+// Поиск отправителя
+function getSenderData(container) {
+  if (!container) return null;
+
+  const labels = container.querySelectorAll(
+    "b, strong, h1, h2, h3, h4, h5, h6"
+  );
+
+  for (const label of labels) {
+    const labelText = label.textContent.trim();
+
+    if (
+      labelText !== "Отправитель" &&
+      labelText !== "Отправитель:"
+    ) {
+      continue;
+    }
+
+    console.log("✅ Найден заголовок отправителя:", label);
+
+    // Идём по всем DOM-узлам после заголовка:
+    // text node, <br>, <p>, <span>, <a> и т.д.
+    let node = label.nextSibling;
+
+    while (node) {
+      // Пропускаем пустые текстовые узлы.
+      if (
+        node.nodeType === Node.TEXT_NODE &&
+        !node.textContent.trim()
+      ) {
+        node = node.nextSibling;
+        continue;
+      }
+
+      // Пропускаем <br>.
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        node.tagName === "BR"
+      ) {
+        node = node.nextSibling;
+        continue;
+      }
+
+      // Новый/старый формат: имя лежит просто текстом.
+      if (node.nodeType === Node.TEXT_NODE) {
+        const value = node.textContent.trim();
+
+        if (value) {
+          // Оборачиваем имя в span, чтобы badge поставить после него.
+          const senderElement = document.createElement("span");
+
+          senderElement.className = "my-hook-sender-value";
+          senderElement.textContent = value;
+
+          node.parentNode.replaceChild(senderElement, node);
+
+          console.log("✅ Отправитель найден как текст:", value);
+
+          return {
+            value,
+            el: senderElement
+          };
+        }
+      }
+
+      // Имя лежит в <p>, <span>, <div> и т.д.
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const value = node.textContent.trim();
+
+        // Не считаем email-ссылку именем отправителя,
+        // если это единственный элемент после заголовка.
+        const isEmailLink =
+          node.tagName === "A" &&
+          (node.getAttribute("href") || "").startsWith("mailto:");
+
+        if (value && !isEmailLink) {
+          console.log("✅ Отправитель найден в элементе:", value);
+
+          return {
+            value,
+            el: node
+          };
+        }
+      }
+
+      node = node.nextSibling;
+    }
+  }
+
+  return null;
+}
 
 // получение контактов и отправка их в backgrounds
 function processContacts() {
@@ -1103,29 +1234,41 @@ function getContacts() {
     console.log("google обработаны")
 
     // ✅ отправитель
-    const divs = container.querySelectorAll("div");
+    const senderData = getSenderData(container);
 
-    divs.forEach(div => {
-        const label = div.querySelector("b, strong");
+    if (senderData) {
+      const senderValue = String(senderData.value)
+        .trim()
+        .toLowerCase();
 
-        if (label && label.innerText.includes("Отправитель")) {
-            const text = div.childNodes[div.childNodes.length - 1]?.textContent.trim(); // получаем всю ветку и берем последний элемент
+      // Проверяем, был ли уже найден такой же контакт.
+      const senderAlreadyExists = contacts.some((contact) => {
+        const contactValue = String(contact.value)
+          .trim()
+          .toLowerCase();
 
-            console.log("отправитель", div)
+        return contactValue === senderValue;
+      });
 
-            if (!text) return;
+      if (senderAlreadyExists) {
+        console.log(
+          "⏭ Отправитель уже найден как другой контакт, пропускаем:",
+          senderData.value
+        );
+      } else {
+        console.log(
+          "✅ Добавляем отправителя:",
+          senderData.value
+        );
 
-            contacts.push({
-                value: text,
-                el: div
-            });
-        }
-    });
+        contacts.push({
+          value: senderData.value,
+          el: senderData.el
+        });
+      }
+    }
     
-    console.log("Nickname обработаны")
-
-    console.log(contacts)
-    return contacts
+    return contacts;
 }
 
 // отправка в background
@@ -1159,7 +1302,9 @@ function add_inf_to_element(el, msg) {
     if (!el) return;
     if (msg.count === 0) return;
 
-    if (el.nextSibling && el.nextSibling.classList?.contains("my-hook-badge")) return;
+    if (el.nextElementSibling?.classList?.contains("my-hook-badge")) {
+      return;
+    }
 
     // отрисовка счетчика
     const badge = document.createElement("a");
@@ -1220,7 +1365,7 @@ function add_inf_to_element(el, msg) {
         tooltip.style.display = "none";
     });
 
-    el.appendChild(badge);
+    el.insertAdjacentElement("afterend", badge);
 }
 
 // =======================
@@ -1625,6 +1770,7 @@ function set_block(data) {
       if (dataBase) {
 
         const dataBaseBlock = document.createElement('div');
+        dataBaseBlock.className = "database-version-block"
         dataBaseBlock.setAttribute("style",`border:2px solid ${resultColor};border-radius:15px;padding: 0.1em;justify-content: space-between;text-align:center;background-color:${resultColor};color:white`);
         dataBaseBlock.innerHTML = `${resultCompaireDate}`
         links.after(dataBaseBlock);
@@ -1640,5 +1786,178 @@ function toNSPD(lat, lon) {
   return [x, y];
 
 }    
+
+// =======================
+// ✅ Блок настройки расширения
+// =======================
+
+const DEFAULT_SETTINGS = {
+  highlightEnabled: true,
+  filtersEnabled: true,
+  contactsEnabled: true,
+  mapLinksEnabled: true,
+  closeWarningEnabled: true
+};
+
+let settings = {
+  ...DEFAULT_SETTINGS
+};
+
+let contactsObserver = null;
+
+// Получение настроек
+function loadSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(DEFAULT_SETTINGS, (savedSettings) => {
+      settings = {
+        ...DEFAULT_SETTINGS,
+        ...savedSettings
+      };
+
+      console.log("⚙️ Настройки загружены:", settings);
+
+      resolve(settings);
+    });
+  });
+}
+
+// Применение изменений настроек
+function handleSettingsChanged(changes, areaName) {
+  if (areaName !== "local") {
+    return;
+  }
+
+  Object.entries(changes).forEach(([key, change]) => {
+    settings[key] = change.newValue;
+
+    console.log(
+      "⚙️ Настройка изменена:",
+      key,
+      "→",
+      change.newValue
+    );
+  });
+
+  applyChangedSettings(changes);
+}
+
+
+function applyChangedSettings(changes) {
+  
+  // Подсветка сроков
+  if (changes.highlightEnabled) {
+    if (settings.highlightEnabled) {
+      console.log("✅ Подсветка сроков включена");
+
+      if (hasVorwands) {
+        updateVisibleRows();
+      }
+
+      if (state_url === "id") {
+        updatedate();
+      }
+    } else {
+      console.log("🛑 Подсветка сроков выключена");
+
+      clearVorwandHighlights();
+      clearDateHighlight();
+    }
+  }
+
+  // Сохранённые фильтры
+  if (changes.filtersEnabled) {
+    if (settings.filtersEnabled) {
+      console.log("✅ Фильтры включены");
+
+      if (state_url === "search") {
+        draw_filters();
+      }
+    } else {
+      console.log("🛑 Фильтры выключены");
+
+      document.querySelector("#my-filters")?.remove();
+    }
+  }
+
+  // Повторные обращения
+  if (changes.contactsEnabled) {
+    if (settings.contactsEnabled) {
+      console.log("✅ Повторные обращения включены");
+
+      // Если сейчас открыта ЗЦ — запускаем поиск контактов.
+      if (state_url === "id") {
+        waitForMail([
+          'a[href^="fiji://editBySysCode/"]',
+          'a[href^="mailto:"]',
+          'a[href*="vk.com"]',
+          'a[href*="plus.google.com"]'
+        ], () => {
+          if (!settings.contactsEnabled) {
+            return;
+          }
+
+          processContacts();
+        });
+      }
+    } else {
+      console.log("🛑 Повторные обращения выключены");
+
+      removeContactBadges();
+    }
+  }
+
+  // Ссылки и координаты
+  if (changes.mapLinksEnabled) {
+    if (settings.mapLinksEnabled) {
+      console.log("✅ Ссылки и координаты включены");
+
+      if (state_url === "id") {
+        checkPage();
+      }
+    } else {
+      console.log("🛑 Ссылки и координаты выключены");
+
+      removeMapLinks();
+    }
+  }
+}
+
+// ✅ Очистка подсветки ЗЦ
+function clearVorwandHighlights() {
+  document.querySelectorAll("a.vorwand-id").forEach((link) => {
+    link.style.backgroundColor = "";
+  });
+}
+
+// ✅ Очистка подсветки даты
+function clearDateHighlight() {
+  const dateElement = document.querySelector(
+    "a.vorwand-datepicker.territories-allocation_datepicker"
+  );
+
+  if (dateElement) {
+    dateElement.style.backgroundColor = "";
+  }
+}
+
+// ✅ Удаление блока ссылок
+function removeMapLinks() {
+  document.querySelectorAll(
+    ".link-under-the-map, .database-version-block"
+  ).forEach((element) => {
+    element.remove();
+  });
+}
+
+// ✅ Остановка повторных обращений
+function removeContactBadges() {
+  const badges = document.querySelectorAll(".my-hook-badge");
+
+  badges.forEach((badge) => {
+    badge.remove();
+  });
+
+  console.log("🧹 Badge повторных ЗЦ удалены:", badges.length);
+}
 
 init()

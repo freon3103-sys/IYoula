@@ -243,6 +243,7 @@ async function handleRequest(details) {
   }
 
   if (details.url.includes("/api/internal/vorwands/advanced-search")) { // сохраняем последней запрос к АПИ
+    console.log("Запрос поиска обнаружен и сохранен: ", details.url)
     lastAdvancedSearchUrl = details.url;
   }
 
